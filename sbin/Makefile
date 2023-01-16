@@ -10,6 +10,6 @@ SUBDIR=	atactl badsect bioctl clri dhclient dhcpleased \
 	nfsd nologin pdisk pfctl pflogd ping quotacheck \
 	reboot resolvd restore route savecore scan_ffs \
 	scsi slaacd shutdown swapctl sysctl ttyflags tunefs vnconfig \
-	umount unwind wsconsctl
+	umount unwind wsconsctl devd
 
 .include <bsd.subdir.mk>
