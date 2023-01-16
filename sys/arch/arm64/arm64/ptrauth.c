@@ -55,9 +55,9 @@ static bool __read_mostly enable_ptrauth = false;
 
 /* Functions called from assembly. */
 void ptrauth_start(void);
-struct thread *ptrauth_switch(struct thread *);
-void ptrauth_exit_el0(struct thread *);
-void ptrauth_enter_el0(struct thread *);
+struct thread *ptrauth_switch(struct proc *);
+void ptrauth_exit_el0(struct proc *);
+void ptrauth_enter_el0(struct proc *);
 
 void
 ptrauth_init(void)
@@ -94,7 +94,7 @@ ptrauth_init(void)
 
 /* Copy the keys when forking a new process */
 void
-ptrauth_fork(struct thread *new_td, struct thread *orig_td)
+ptrauth_fork(struct proc *new_td, struct proc *orig_td)
 {
 	if (!enable_ptrauth)
 		return;
@@ -105,7 +105,7 @@ ptrauth_fork(struct thread *new_td, struct thread *orig_td)
 
 /* Generate new userspace keys when executing a new process */
 void
-ptrauth_exec(struct thread *td)
+ptrauth_exec(struct proc *td)
 {
 	if (!enable_ptrauth)
 		return;
@@ -119,7 +119,7 @@ ptrauth_exec(struct thread *td)
  * how the ABI expects the various keys to be assigned.
  */
 void
-ptrauth_copy_thread(struct thread *new_td, struct thread *orig_td)
+ptrauth_copy_thread(struct proc *new_td, struct proc *orig_td)
 {
 	if (!enable_ptrauth)
 		return;
@@ -130,7 +130,7 @@ ptrauth_copy_thread(struct thread *new_td, struct thread *orig_td)
 
 /* Generate new kernel keys when executing a new kernel thread */
 void
-ptrauth_thread_alloc(struct thread *td)
+ptrauth_thread_alloc(struct proc *td)
 {
 	if (!enable_ptrauth)
 		return;
@@ -153,7 +153,7 @@ __asm __volatile(						\
 	   "r"(td->td_md.md_ptrauth_##space.name.pa_key_hi))
 
 void
-ptrauth_thread0(struct thread *td)
+ptrauth_thread0(struct proc *td)
 {
 	if (!enable_ptrauth)
 		return;
@@ -228,7 +228,7 @@ ptrauth_mp_start(uint64_t cpu)
 #endif
 
 struct thread *
-ptrauth_switch(struct thread *td)
+ptrauth_switch(struct proc *td)
 {
 	if (enable_ptrauth) {
 		LOAD_KEY(kern, apia);
@@ -240,7 +240,7 @@ ptrauth_switch(struct thread *td)
 
 /* Called when we are exiting uerspace and entering the kernel */
 void
-ptrauth_exit_el0(struct thread *td)
+ptrauth_exit_el0(struct proc *td)
 {
 	if (!enable_ptrauth)
 		return;
@@ -251,7 +251,7 @@ ptrauth_exit_el0(struct thread *td)
 
 /* Called when we are about to exit the kernel and enter userspace */
 void
-ptrauth_enter_el0(struct thread *td)
+ptrauth_enter_el0(struct proc *td)
 {
 	if (!enable_ptrauth)
 		return;
