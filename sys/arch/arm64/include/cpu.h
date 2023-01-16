@@ -65,6 +65,17 @@
 #include <machine/frame.h>
 #include <machine/armreg.h>
 
+/* Pointer Authentication Code (PAC) support */
+void	ptrauth_init(void);
+void	ptrauth_fork(struct proc *, struct proc *);
+void	ptrauth_exec(struct proc *);
+void	ptrauth_copy_thread(struct proc *, struct proc *);
+void	ptrauth_thread_alloc(struct proc *);
+void	ptrauth_thread0(struct proc *);
+#ifdef SMP
+void	ptrauth_mp_start(uint64_t);
+#endif
+
 /* All the CLKF_* macros take a struct clockframe * as an argument. */
 
 #define clockframe trapframe
