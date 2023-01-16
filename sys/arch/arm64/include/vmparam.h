@@ -95,6 +95,20 @@
 #define	VM_MIN_KERNEL_ADDRESS	((vaddr_t)0xffffff8000000000ULL)
 #define	VM_MAX_KERNEL_ADDRESS	((vaddr_t)0xffffff83ffffffffULL)
 
+/* If true addr is in its canonical form (i.e. no TBI, PAC, etc.) */
+#define	ADDR_IS_CANONICAL(addr)	\
+    (((addr) & 0xffff000000000000UL) == 0 || \
+     ((addr) & 0xffff000000000000UL) == 0xffff000000000000UL)
+#define	ADDR_MAKE_CANONICAL(addr) ({			\
+	__typeof(addr) _tmp_addr = (addr);		\
+							\
+	_tmp_addr &= ~0xffff000000000000UL;		\
+	if (ADDR_IS_KERNEL(addr))			\
+		_tmp_addr |= 0xffff000000000000UL;	\
+							\
+	_tmp_addr;					\
+})
+
 /* virtual sizes (bytes) for various kernel submaps */
 #define	VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
 
