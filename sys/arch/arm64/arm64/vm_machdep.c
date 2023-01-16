@@ -85,7 +85,9 @@ cpu_fork(struct proc *p1, struct proc *p2, void *stack, void *tcb,
 	    + USPACE
 	    - sizeof(struct trapframe)
 	    - 0x10);
-
+	
+	ptrauth_fork(p2, p1);
+	
 	tf = (struct trapframe *)STACKALIGN(tf);
 	pcb->pcb_tf = tf;
 	*tf = *p1->p_addr->u_pcb.pcb_tf;
