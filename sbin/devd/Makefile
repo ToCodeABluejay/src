@@ -1,6 +1,6 @@
 # $FreeBSD$
 
-.include <src.opts.mk>
+#.include <src.opts.mk>
 
 WARNS?= 3
 PACKAGE=devd
@@ -8,28 +8,28 @@ CONFGROUPS=	CONFS DEVD
 CONFS=	devd.conf
 DEVD=	devmatch.conf
 DEVDDIR=	/etc/devd
-.if ${MK_ACPI} != "no"
-DEVD+=	asus.conf
-.endif
+#.if ${MK_ACPI} != "no"
+#DEVD+=	asus.conf
+#.endif
 
-.if ${MK_HYPERV} != "no"
-CONFGROUPS+=	HYPERV
-HYPERVDIR=${DEVDDIR}
-HYPERV+=	hyperv.conf
-HYPERVPACKAGE=	hyperv-tools
-.endif
+#.if ${MK_HYPERV} != "no"   # We have to comment the conditionals. They do not agree with OPBSD's build system
+#CONFGROUPS+=	HYPERV        # I presume that could be fixed???? Not current priority.
+#HYPERVDIR=${DEVDDIR}
+#HYPERV+=	hyperv.conf
+#HYPERVPACKAGE=	hyperv-tools
+#.endif
 
-.if ${MK_USB} != "no"
+#.if ${MK_USB} != "no"
 DEVD+=	uath.conf ulpt.conf
-.endif
+#.endif
 
-.if ${MACHINE_ARCH} == "powerpc"
-DEVD+=	apple.conf
-.endif
+#.if ${MACHINE_ARCH} == "powerpc"
+#DEVD+=	apple.conf
+#.endif
 
-.if ${MK_ZFS} != "no"
-DEVD+=	zfs.conf
-.endif
+#.if ${MK_ZFS} != "no"  #We know that we are likely not using ZFS on OpenBSD...
+#DEVD+=	zfs.conf
+#.endif
 
 PROG_CXX=devd
 SRCS=	devd.cc token.l parse.y y.tab.h
