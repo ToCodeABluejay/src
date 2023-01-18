@@ -1,4 +1,4 @@
-/*	$OpenBSD: editor.c,v 1.388 2023/01/14 18:21:46 krw Exp $	*/
+/*	$OpenBSD: editor.c,v 1.392 2023/01/18 12:59:16 krw Exp $	*/
 
 /*
  * Copyright (c) 1997-2000 Todd C. Miller <millert@openbsd.org>
@@ -42,7 +42,8 @@
 #include "extern.h"
 #include "pathnames.h"
 
-#define MAXIMUM(a, b)	(((a) > (b)) ? (a) : (b))
+#define	ROUNDUP(_s, _a)		((((_s) + (_a) - 1) / (_a)) * (_a))
+#define	ROUNDDOWN(_s, _a)	(((_s) / (_a)) * (_a))
 
 /* flags for getuint64() */
 #define	DO_CONVERSIONS	0x00000001
@@ -533,7 +534,7 @@ editor_allocspace(struct disklabel *lp_org)
 	struct partition *pp;
 	const struct diskchunk *chunk;
 	u_int64_t chunkstart, chunksize, start, stop;
-	u_int64_t cylsecs, secs, xtrasecs;
+	u_int64_t secs, xtrasecs;
 	char **partmp;
 	int i, lastalloc, index, partno, freeparts;
 	extern int64_t physmem;
@@ -553,7 +554,6 @@ editor_allocspace(struct disklabel *lp_org)
 			resizeok = 0;
 	}
 
-	cylsecs = lp_org->d_secpercyl;
 	alloc = NULL;
 	index = -1;
 again:
@@ -624,9 +624,8 @@ again:
 #ifdef SUN_CYLCHECK
 			if (lp->d_flags & D_VENDOR) {
 				/* Align to cylinder boundaries. */
-				start = ((start + cylsecs - 1) / cylsecs) *
-				    cylsecs;
-				stop = (stop / cylsecs) * cylsecs;
+				start = ROUNDUP(start, lp_org->d_secpercyl);
+				stop = ROUNDDOWN(stop, lp_org->d_secpercyl);
 				if (start > stop)
 					start = stop;
 			}
@@ -652,9 +651,9 @@ again:
 		}
 #ifdef SUN_CYLCHECK
 		if (lp->d_flags & D_VENDOR) {
-			secs = ((secs + cylsecs - 1) / cylsecs) * cylsecs;
+			secs = ROUNDUP(secs, lp_org->d_secpercyl);
 			while (secs > chunksize)
-				secs -= cylsecs;
+				secs -= lp_org->d_secpercyl;
 		}
 #endif
 
@@ -745,11 +744,8 @@ editor_resize(struct disklabel *lp, char *p)
 	}
 
 #ifdef SUN_CYLCHECK
-	if (lp->d_flags & D_VENDOR) {
-		u_int64_t cylsecs;
-		cylsecs = lp->d_secpercyl;
-		ui = ((ui + cylsecs - 1) / cylsecs) * cylsecs;
-	}
+	if (lp->d_flags & D_VENDOR)
+		ui = ROUNDUP(ui, lp->d_secpercyl);
 #endif
 	if (DL_GETPOFFSET(pp) + ui > ending_sector) {
 		fputs("Amount too big\n", stderr);
@@ -816,20 +812,26 @@ editor_add(struct disklabel *lp, char *p)
 	const struct diskchunk *chunk;
 	char buf[2];
 	int partno;
-	u_int64_t freesectors, new_offset, new_size;
+	u_int64_t new_offset, new_size;
 
-	freesectors = editor_countfree(lp);
+	chunk = free_chunks(lp, -1);
+	new_size = new_offset = 0;
+	for (; chunk->start != 0 || chunk->stop != 0; chunk++) {
+		if (chunk->stop - chunk->start > new_size) {
+			new_size = chunk->stop - chunk->start;
+			new_offset = chunk->start;
+		}
+	}
 
-	/* XXX - prompt user to steal space from another partition instead */
 #ifdef SUN_CYLCHECK
-	if ((lp->d_flags & D_VENDOR) && freesectors < lp->d_secpercyl) {
+	if ((lp->d_flags & D_VENDOR) && new_size < lp->d_secpercyl) {
 		fputs("No space left, you need to shrink a partition "
 		    "(need at least one full cylinder)\n",
 		    stderr);
 		return;
 	}
 #endif
-	if (freesectors == 0) {
+	if (new_size == 0) {
 		fputs("No space left, you need to shrink a partition\n",
 		    stderr);
 		return;
@@ -862,11 +864,13 @@ editor_add(struct disklabel *lp, char *p)
 	}
 	pp = &lp->d_partitions[partno];
 
-	if (pp->p_fstype != FS_UNUSED && DL_GETPSIZE(pp) != 0) {
+	if (partno < lp->d_npartitions && pp->p_fstype != FS_UNUSED &&
+	    DL_GETPSIZE(pp) != 0) {
 		fprintf(stderr, "Partition '%c' exists.  Delete it first.\n",
 		    p[0]);
 		return;
 	}
+	memset(pp, 0, sizeof(*pp));
 
 	/*
 	 * Increase d_npartitions if necessary. Ensure all new partitions are
@@ -875,22 +879,6 @@ editor_add(struct disklabel *lp, char *p)
 	for(; lp->d_npartitions <= partno; lp->d_npartitions++)
 		memset(&lp->d_partitions[lp->d_npartitions], 0, sizeof(*pp));
 
-	/* Make sure selected partition is zero'd too. */
-	memset(pp, 0, sizeof(*pp));
-	chunk = free_chunks(lp, -1);
-
-	/*
-	 * Since we know there's free space, there must be at least one
-	 * chunk. So find the largest chunk and assume we want to add the
-	 * partition in that free space.
-	 */
-	new_size = new_offset = 0;
-	for (; chunk->start != 0 || chunk->stop != 0; chunk++) {
-		if (chunk->stop - chunk->start > new_size) {
-			new_size = chunk->stop - chunk->start;
-			new_offset = chunk->start;
-		}
-	}
 	DL_SETPSIZE(pp, new_size);
 	DL_SETPOFFSET(pp, new_offset);
 	pp->p_fstype = partno == 1 ? FS_SWAP : FS_BSDFFS;
@@ -2300,9 +2288,9 @@ alignpartition(struct disklabel *lp, int partno, u_int64_t startalign,
 
 	start = DL_GETPOFFSET(pp);
 	if ((flags & ROUND_OFFSET_UP) == ROUND_OFFSET_UP)
-		start = ((start + startalign - 1) / startalign) * startalign;
+		start = ROUNDUP(start, startalign);
 	else if ((flags & ROUND_OFFSET_DOWN) == ROUND_OFFSET_DOWN)
-		start = (start / startalign) * startalign;
+		start = ROUNDDOWN(start, startalign);
 
 	/* Find the chunk that contains 'start'. */
 	chunk = free_chunks(lp, partno);
@@ -2319,15 +2307,15 @@ alignpartition(struct disklabel *lp, int partno, u_int64_t startalign,
 
 	/* Calculate the new 'stop' sector, the sector after the partition. */
 	if ((flags & ROUND_SIZE_OVERLAP) == 0)
-		maxstop = (chunk->stop / stopalign) * stopalign;
+		maxstop = ROUNDDOWN(chunk->stop, stopalign);
 	else
-		maxstop = (ending_sector / stopalign) * stopalign;
+		maxstop = ROUNDDOWN(ending_sector, stopalign);
 
 	stop = DL_GETPOFFSET(pp) + DL_GETPSIZE(pp);
 	if ((flags & ROUND_SIZE_UP) == ROUND_SIZE_UP)
-		stop = ((stop + stopalign - 1) / stopalign) * stopalign;
+		stop = ROUNDUP(stop, stopalign);
 	else if ((flags & ROUND_SIZE_DOWN) == ROUND_SIZE_DOWN)
-		stop = (stop / stopalign) * stopalign;
+		stop = ROUNDDOWN(stop, stopalign);
 	if (stop > maxstop)
 		stop = maxstop;
 

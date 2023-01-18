@@ -287,8 +287,6 @@ cpu_startup(void)
 	curpcb = &proc0.p_addr->u_pcb;
 	curpcb->pcb_flags = 0;
 	curpcb->pcb_tf = &proc0tf;
-	
-	ptrauth_thread0(&proc0);
 
 	if (boothowto & RB_CONFIG) {
 #ifdef BOOT_CONFIG
