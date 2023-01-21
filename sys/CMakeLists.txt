@@ -2,8 +2,13 @@ cmake_minimum_required(VERSION 3.0)  # CMake version check
 project(system)                     # Create project
 set(C_STANDARD 1)                    # Set C11 standard
 
+target_include_directories(sys
+                            public
+                            sys/
+                            )
+
 # Be sure to include the needed subriectories
-add_subdirectory(arch)
+#add_subdirectory(arch)
 add_subdirectory(conf)
 add_subdirectory(crypto)
 add_subdirectory(ddb)
